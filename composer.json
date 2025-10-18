@@ -1,0 +1,46 @@
+{
+    "name": "sagar-s-bhedodkar/laravel-index-advisor",
+    "description": "Monitor Eloquent/DB queries in your Laravel application and suggest scaffold migrations for missing indexes.",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Sagar S Bhedodkar",
+            "email": "sagarbhedodkar456@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "^9.0|^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^7.8|^8.0|^9.0",
+        "phpunit/phpunit": "^9.5 || ^10.0",
+        "mockery/mockery": "^1.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "SagarSBhedodkar\\IndexAdvisor\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SagarSBhedodkar\\IndexAdvisor\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "SagarSBhedodkar\\IndexAdvisor\\IndexAdvisorServiceProvider"
+            ],
+            "aliases": {
+                "IndexAdvisor": "SagarSBhedodkar\\IndexAdvisor\\Facades\\IndexAdvisor"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "scripts": {
+        "test": "phpunit"
+    }
+}
