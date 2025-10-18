@@ -80,71 +80,52 @@ class Advisor
         }
 
         $threshold = $this->config['slow_query_threshold_ms'] ?? 200;
+        $usageThreshold = $this->config['usage_threshold'] ?? 5;
+        $counts = [];
         $suggestions = [];
 
-        // Group queries by table and column usage
         foreach ($stored as $entry) {
             $sql = $entry['sql'];
             $time = floatval($entry['time']);
-            // find table names and where columns using simple regexes (best-effort)
             $tables = $this->extractTables($sql);
-            $whereColumns = $this->extractWhereColumns($sql);
+            $columns = $this->extractWhereColumns($sql);
 
             foreach ($tables as $table) {
-                foreach ($whereColumns as $col) {
-                    // ignore columns in ignore_columns
-                    if ($this->shouldIgnoreColumn($table, $col)) {
-                        continue;
-                    }
+                foreach ($columns as $col) {
+                    if ($this->shouldIgnoreColumn($table, $col)) continue;
 
-                    // we only suggest for slow queries or repeated usage
-                    $key = strtolower($table . '::' . $col);
+                    $key = strtolower("{$table}::{$col}");
+                    $counts[$key] = ($counts[$key] ?? 0) + 1;
 
-                    // use counters in memory
-                    if (!isset($counts[$key])) {
-                        $counts[$key] = 0;
-                    }
-                    $counts[$key]++;
+                    $reason = $time >= $threshold ? "slow_query_" . round($time,2) . "ms"
+                        : ($counts[$key] >= $usageThreshold ? "used_{$counts[$key]}_times" : null);
 
-                    $timeExceeded = $time >= $threshold;
-
-                    // simple heuristic: suggest index if slow OR used > N times
-                    $countThreshold = $this->config['usage_threshold'] ?? 5;
-                    if ($timeExceeded || $counts[$key] >= $countThreshold) {
-                        $suggestions[$key] = [
-                            'table' => $table,
-                            'columns' => [$col],
-                            'reason' => $timeExceeded ? "slow_query_{$time}ms" : "used_{$counts[$key]}_times",
-                            'sql_examples' => [$sql],
-                        ];
-                    } else {
-                        // track sql examples for future use, but don't promote suggestion yet
+                    if ($reason) {
                         if (!isset($suggestions[$key])) {
                             $suggestions[$key] = [
                                 'table' => $table,
                                 'columns' => [$col],
-                                'reason' => null,
+                                'reason' => $reason,
                                 'sql_examples' => [$sql],
                             ];
                         } else {
                             $suggestions[$key]['sql_examples'][] = $sql;
+                            $suggestions[$key]['sql_examples'] = array_values(array_unique($suggestions[$key]['sql_examples']));
                         }
                     }
                 }
             }
         }
 
-        // remove null reason suggestions (optional)
+        // Clean and reindex final output
         $final = [];
-        foreach ($suggestions as $k => $s) {
-            if (!empty($s['reason'])) {
-                $final[] = [
-                    'table' => $s['table'],
-                    'columns' => array_values(array_unique($s['columns'])),
-                    'reason' => $s['reason'],
-                    'sql_examples' => array_values(array_unique($s['sql_examples'])),
-                ];
-            }
+        foreach ($suggestions as $s) {
+            $final[] = [
+                'table' => $s['table'],
+                'columns' => array_values(array_unique($s['columns'])),
+                'reason' => $s['reason'],
+                'sql_examples' => array_values(array_unique($s['sql_examples'])),
+            ];
         }
 
         return $final;
@@ -237,26 +218,20 @@ PHP;
     {
         $tables = [];
 
-        // matches FROM `table` or FROM table
-        if (preg_match_all('/FROM\s+`?([a-zA-Z0-9_]+)`?/i', $sql, $m)) {
-            $tables = array_merge($tables, $m[1]);
+        // Match FROM `table` or FROM table
+        if (preg_match_all('/FROM\s+`?([a-zA-Z0-9_]+)`?/i', $sql, $matches)) {
+            $tables = array_merge($tables, $matches[1]);
         }
 
-        // matches JOIN `table`
-        if (preg_match_all('/JOIN\s+`?([a-zA-Z0-9_]+)`?/i', $sql, $m)) {
-            $tables = array_merge($tables, $m[1]);
+        // Match JOIN `table`
+        if (preg_match_all('/JOIN\s+`?([a-zA-Z0-9_]+)`?/i', $sql, $matches)) {
+            $tables = array_merge($tables, $matches[1]);
         }
 
-        // fallback: SELECT ... FROM table1, table2
-        if (preg_match_all('/FROM\s+([a-zA-Z0-9_`,\s]+)/i', $sql, $m)) {
-            foreach (explode(',', $m[1][0]) as $part) {
-                $part = trim($part, " `");
-                if ($part !== '') {
-                    $tables[] = $part;
-                }
-            }
-        }
+        // Remove any trailing fragments from previous regex issues
+        $tables = array_map(fn($t) => trim($t, " `"), $tables);
 
+        // Deduplicate
         return array_values(array_unique($tables));
     }
 
