@@ -1,128 +1,114 @@
-# Laravel Index Advisor
+# 🧱 Laravel Index Advisor
 
-**Monitor your Eloquent/DB queries in Laravel and get actionable index suggestions to optimize performance.**
+> **Monitor your Eloquent/DB queries in Laravel and get actionable index suggestions to optimize performance.**
 
-[![Latest Version](https://img.shields.io/packagist/v/sagar-s-bhedodkar/laravel-index-advisor.svg)](https://packagist.org/packages/sagar-s-bhedodkar/laravel-index-advisor)
-[![License](https://img.shields.io/packagist/l/sagar-s-bhedodkar/laravel-index-advisor.svg)](https://packagist.org/packages/sagar-s-bhedodkar/laravel-index-advisor)
-
----
-
-## Features
-
-* Record all executed queries in your application (Eloquent & Query Builder).
-* Analyse queries for **slow execution** or **frequent usage**.
-* Suggest database indexes per table/column automatically.
-* Optionally generate **migration stubs** for easy index creation.
-* Configurable cache driver and storage limits.
-* Lightweight and developer-friendly; works only in non-production environments by default.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Laravel](https://img.shields.io/badge/Laravel-10.x%20|%2011.x%20|%2012.x-red.svg)](https://laravel.com)
+[![Packagist](https://img.shields.io/packagist/v/sagar-s-bhedodkar/laravel-index-advisor.svg)](https://packagist.org/packages/sagar-s-bhedodkar/laravel-index-advisor)
 
 ---
 
-## Installation
+## 📘 Table of Contents
 
-Install via Composer:
+* [Introduction](#-introduction)
+* [Features](#-features)
+* [Installation](#-installation)
+* [Configuration](#-configuration)
+* [Usage](#-usage)
+* [Artisan Commands](#-artisan-commands)
+* [Contributing](#-contributing)
+* [License](#-license)
+* [Author](#-author)
 
-```bash
-composer require sagar-s-bhedodkar/laravel-index-advisor
-```
+---
 
-If using **local path during development**:
+## 🚀 Introduction
 
-```json
-"repositories": [
-    {
-        "type": "path",
-        "url": "../laravel-index-advisor"
-    }
-]
-```
+**Laravel Index Advisor** is a Laravel package that **monitors your database queries** and provides **intelligent suggestions for missing indexes**. It helps developers identify slow or frequently-used queries and optimize database performance with actionable recommendations.
 
-Then require it via Composer:
+---
+
+## ✨ Features
+
+* 📊 Tracks Eloquent and DB queries automatically
+* ⏱️ Detects slow queries using a configurable threshold
+* 🛠️ Suggests indexes for columns used in WHERE clauses
+* 💾 Caches queries to analyze repeated usage
+* 🔄 Optional migration generation for suggested indexes
+* ⚙️ Artisan commands for query management
+* ✅ Production-ready and configurable
+
+---
+
+## ⚙️ Installation
+
+Require the package via Composer:
 
 ```bash
 composer require sagar-s-bhedodkar/laravel-index-advisor:@dev
 ```
 
+The package **auto-discovers** itself; no manual registration is required.
+
+Publish the configuration file (optional):
+
+```bash
+php artisan vendor:publish --tag=config
+```
+
 ---
 
-## Configuration
+## 🛠 Configuration
 
-Publish the configuration file:
-
-```bash
-php artisan vendor:publish --provider="SagarSBhedodkar\IndexAdvisor\IndexAdvisorServiceProvider" --tag=config
-```
-
-This creates:
-
-```bash
-config/index-advisor.php
-```
-
-### Example `config/index-advisor.php`
+The configuration file `config/index-advisor.php` allows you to customize the behavior:
 
 ```php
 return [
-    'enabled' => true,                        // Enable/disable advisor
-    'slow_query_threshold_ms' => 200,         // Query time threshold for slow queries
+    'enabled' => true,
+    'slow_query_threshold_ms' => 200,
     'ignore_tables' => ['migrations', 'jobs', 'failed_jobs'],
     'ignore_columns' => ['id', 'created_at', 'updated_at'],
-    'ignore_by_table' => [],
     'cache_key' => 'index_advisor:queries',
-    'cache_ttl' => 86400,                     // Cache TTL in seconds
-    'max_storage' => 1000,                     // Max queries to store
-    'usage_threshold' => 5,                    // Minimum repeat usage for suggestion
-    'auto_generate_migrations' => false,      // Generate migration stub automatically
-    'cache_driver' => 'file',                 // Cache driver for storing queries
-    'min_rows' => 50,                          // Minimum rows in table to consider indexing
+    'cache_ttl' => 86400,
+    'max_storage' => 1000,
+    'usage_threshold' => 5,
+    'auto_generate_migrations' => false,
+    'cache_driver' => 'file',
+    'min_rows' => 50,
 ];
 ```
 
+* `slow_query_threshold_ms`: Threshold for marking a query as slow
+* `usage_threshold`: Number of times a column must be used to trigger an index suggestion
+* `auto_generate_migrations`: If `true`, automatically generate migration stubs for missing indexes
+
 ---
 
-## Usage
+## 🧠 Usage
 
-### 1. Analyse queries
+### Record Queries
 
-After running your application and executing queries, retrieve suggestions:
+Laravel Index Advisor automatically records queries during runtime.
+
+### Analyze Queries
+
+To get index suggestions:
 
 ```php
 use SagarSBhedodkar\IndexAdvisor\Facades\IndexAdvisor;
 
 $suggestions = IndexAdvisor::analyse();
+return response()->json($suggestions);
 ```
 
-Example output:
-
-```json
-[
-  {
-    "table": "users",
-    "columns": ["email"],
-    "reason": "slow_query_21.17ms",
-    "sql_examples": [
-      "select * from `users` where `email` like 'user%@example.com' order by `name` asc"
-    ]
-  }
-]
-```
-
----
-
-### 2. Generate Migration Stubs
+### Generate Migration Stub
 
 ```php
-$migrationCode = IndexAdvisor::generateMigrationStub($suggestions);
-file_put_contents(database_path('migrations/' . now()->format('Y_m_d_His') . '_add_indexes.php'), $migrationCode);
+$stub = IndexAdvisor::generateMigrationStub($suggestions);
+file_put_contents(database_path('migrations/' . now()->format('Y_m_d_His') . '_add_indexes.php'), $stub);
 ```
 
-This creates a migration file with `up()` and `down()` methods for each suggested index.
-
----
-
-### 3. Clear Stored Queries
-
-To reset analysis cache:
+### Clear Stored Queries
 
 ```php
 IndexAdvisor::clearStored();
@@ -130,41 +116,37 @@ IndexAdvisor::clearStored();
 
 ---
 
-## Facade
+## 🧰 Artisan Commands
 
-You can use the Facade for convenience:
-
-```php
-use SagarSBhedodkar\IndexAdvisor\Facades\IndexAdvisor;
-
-$suggestions = IndexAdvisor::analyse();
-```
+* `php artisan index-advisor:generate-migration` — Generate a migration for suggested indexes
+* Additional commands may be added for managing cache and recorded queries
 
 ---
 
-## Commands
+## 🤝 Contributing
 
-If needed, you can add custom Artisan commands for your workflow (like generating migration automatically).
-These are registered automatically when running in console mode.
+Contributions are welcome!
 
----
-
-## Notes
-
-* Advisor is **designed for development and staging environments** — do **not enable in production** unless you fully understand implications.
-* Works with any database supported by Laravel (MySQL, PostgreSQL, SQLite, etc.).
-* Cache driver can be configured in `config/index-advisor.php`.
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/new-feature`
+3. Commit your changes: `git commit -m "Add new feature"`
+4. Push to your fork: `git push origin feature/new-feature`
+5. Submit a Pull Request 🎉
 
 ---
 
-## Contributing
+## 📄 License
 
-1. Fork the repository.
-2. Make your changes.
-3. Submit a Pull Request.
+This package is open-sourced software licensed under the **MIT license**.
 
 ---
 
-## License
+## 👨‍💻 Author
 
-MIT License © Sagar Sunil Bhedodkar
+**Sagar Sunil Bhedodkar**
+📧 [sagarbhedodkar456@gmail.com](mailto:sagarbhedodkar456@gmail.com)
+🌐 [GitHub Profile](https://github.com/sagar-s-bhedodkar)
+
+---
+
+> Made with ❤️ for Laravel developers who want actionable index suggestions and optimized database performance.
